@@ -1,0 +1,611 @@
+w95cc スクリプトバイナリコンパイラ。
+	2passで1pass目でマクロ展開、パス目でバイナリに落とします。
+	これも make.c 内蔵です。
+	マクロはマクロアセンブラのマクロとC言語の#defineマクロを混ぜた感じの独自版です。
+	リバースエンジニアリングはしていませんので、MITライセンスの元、公開いたします。
+	ハッシュテーブルは、リンクがあるタイプを使っています。
+
+
+●プリプロセッサーディレクティブ
+	◆msc7.0 準拠の物
+		#define, #elif, #else, #endif, #if, #ifdef, #error
+		#include, #line, #undef, #ifdef
+
+
+	◆まだ定義していないもの
+		#pragma
+
+
+	◆削除したもの
+		行末の \ は、c 言語では行の連結を意味しますが、アセンブラタイプ
+		のマクロ命令 #amacro,#adefine の仕様拡張のため、削除しました。
+		c 言語タイプなら最後のパラメーターの終わりに ) が来ますが、
+		アセンブラタイプの場合、行末に \ が来る場合があり得ます。
+		もし、c 言語タイプのみしか使用しない場合、\ を可能にしますので、
+		ご一報下さい。
+		8 進数はアセンブラタイプの為に、使用できないようにしてあります。
+
+
+	◆追加したもの
+		#mes	#error 命令と同じ機能で、コンパイルがストップしない
+		#elseif	#elif 命令と同じ機能
+		2 進数 0n1111,0n0101 等、0n を先頭に付ける。
+
+
+	◆組み込み macro
+		ansi 準拠で、以下の組み込み macro が使えます。
+		__DATE__, __FILE__, __LINE__, __TIME__, __TIMESTAMP__
+
+		更に、filename の為の組み込み macro が使えます。
+		\ の扱いには十分気を付けて下さい。 __FILE__0 系 と __FILE__2 系
+		は、常にエラーが出る可能性があります。
+		__FILE__ だと現在のコンパイルファイルのファイル名を返します。
+		#include されたファイル中で使った場合、#include されたファイルの
+		ファイル名が返されます。
+		__FILE0__ だと常に一定して元々のベースファイルのファイル名が返されます。
+
+		__FILE__0D	drive				c:
+		__FILE__0DP	drive path			c:\windows\system
+		__FILE__0DPF	drive path filename		c:\windows\system\user32
+		__FILE__0DPFE	drive path filename extension	c:\windows\system\user32.dll
+		__FILE__0P	path				\windows\system\
+		__FILE__0PF	path filename			\windows\system\user32
+		__FILE__0PFE	path filename extension		\windows\system\user32.dll
+		__FILE__0F	filename			user32
+		__FILE__0FE	filename extension		user32.dll
+		__FILE__0E	extension			.dll
+
+		__FILE__1D	drive				c:
+		__FILE__1DP	drive path			c:\\windows\\system
+		__FILE__1DPF	drive path filename		c:\\windows\\system\\user32
+		__FILE__1DPFE	drive path filename extension	c:\\windows\\system\\user32.dll
+		__FILE__1P	path				\\windows\\system\\
+		__FILE__1PF	path filename			\\windows\\system\\user32
+		__FILE__1PFE	path filename extension		\\windows\\system\\user32.dll
+		__FILE__1F	filename			user32
+		__FILE__1FE	filename extension		user32.dll
+		__FILE__1E	extension			.dll
+
+		__FILE__2D	drive				"c:"
+		__FILE__2DP	drive path			"c:\windows\system"
+		__FILE__2DPF	drive path filename		"c:\windows\system\user32"
+		__FILE__2DPFE	drive path filename extension	"c:\windows\system\user32.dll"
+		__FILE__2P	path				"\windows\system\"
+		__FILE__2PF	path filename			"\windows\system\user32"
+		__FILE__2PFE	path filename extension		"\windows\system\user32.dll"
+		__FILE__2F	filename			"user32"
+		__FILE__2FE	filename extension		"user32.dll"
+		__FILE__2E	extension			".dll"
+
+		__FILE__3D	drive				"c:"
+		__FILE__3DP	drive path			"c:\\windows\\system"
+		__FILE__3DPF	drive path filename		"c:\\windows\\system\\user32"
+		__FILE__3DPFE	drive path filename extension	"c:\\windows\\system\\user32.dll"
+		__FILE__3P	path				"\\windows\\system\\"
+		__FILE__3PF	path filename			"\\windows\\system\\user32"
+		__FILE__3PFE	path filename extension		"\\windows\\system\\user32.dll"
+		__FILE__3F	filename			"user32"
+		__FILE__3FE	filename extension		"user32.dll"
+		__FILE__3E	extension			".dll"
+
+		__FILE__4D	drive				C:
+		__FILE__4DP	drive path			C:\WINDOWS\SYSTEM
+		__FILE__4DPF	drive path filename		C:\WINDOWS\SYSTEM\USER32
+		__FILE__4DPFE	drive path filename extension	C:\WINDOWS\SYSTEM\USER32.DLL
+		__FILE__4P	path				\WINDOWS\SYSTEM\
+		__FILE__4PF	path filename			\WINDOWS\SYSTEM\USER32
+		__FILE__4PFE	path filename extension		\WINDOWS\SYSTEM\USER32.DLL
+		__FILE__4F	filename			USER32
+		__FILE__4FE	filename extension		USER32.DLL
+		__FILE__4E	extension			.DLL
+
+		__FILE__5D	drive				C:
+		__FILE__5DP	drive path			C:\\WINDOWS\\SYSTEM
+		__FILE__5DPF	drive path filename		C:\\WINDOWS\\SYSTEM\\USER32
+		__FILE__5DPFE	drive path filename extension	C:\\WINDOWS\\SYSTEM\\USER32.DLL
+		__FILE__5P	path				\\WINDOWS\\SYSTEM\\
+		__FILE__5PF	path filename			\\
+		__FILE__5PFE	path filename extension		\\WINDOWS\\SYSTEM\\USER32.DLL
+		__FILE__5F	filename			USER32
+		__FILE__5FE	filename extension		USER32.DLL
+		__FILE__5E	extension			.DLL
+
+		__FILE__6D	drive				"C:"
+		__FILE__6DP	drive path			"C:\WINDOWS\SYSTEM"
+		__FILE__6DPF	drive path filename		"C:\WINDOWS\SYSTEM\USER32"
+		__FILE__6DPFE	drive path filename extension	"C:\WINDOWS\SYSTEM\USER32.DLL"
+		__FILE__6P	path				"\WINDOWS\SYSTEM\"
+		__FILE__6PF	path filename			"\WINDOWS\SYSTEM\USER32"
+		__FILE__6PFE	path filename extension		"\WINDOWS\SYSTEM\USER32.DLL"
+		__FILE__6F	filename			"USER32"
+		__FILE__6FE	filename extension		"USER32.DLL"
+		__FILE__6E	extension			".DLL"
+
+		__FILE__7D	drive				"C:"
+		__FILE__7DP	drive path			"C:\\WINDOWS\\SYSTEM"
+		__FILE__7DPF	drive path filename		"C:\\WINDOWS\\SYSTEM\\USER32"
+		__FILE__7DPFE	drive path filename extension	"C:\\WINDOWS\\SYSTEM\\USER32.DLL"
+		__FILE__7P	path				"\\WINDOWS\\SYSTEM\\"
+		__FILE__7PF	path filename			"\\WINDOWS\\SYSTEM\\USER32"
+		__FILE__7PFE	path filename extension		"\\WINDOWS\\SYSTEM\\USER32.DLL"
+		__FILE__7F	filename			"USER32"
+		__FILE__7FE	filename extension		"USER32.DLL"
+		__FILE__7E	extension			".DLL"
+
+
+	◆文字列への仕様の追加
+		ダブルクォーテーション ( " ) で区切られた文字列の中で < と > で
+		区切られた文字列は、#define で定義された文字列へ展開します。
+		< と > を文字として認識させたい場合、\< , \> と記述する必要があ
+		ります。
+		その際、\< と \> は、プリプロセッサにより展開され、
+		コンパイラーへは単なる文字の < と > になって渡されます。
+		なお、< と > のネストも出来ます。
+
+		( ex.1 )
+		#define place0 学校
+		printf ( "ここは<place0>だ" );
+
+		( ex.2 )
+		#define town0 町
+		#define place town
+		printf ( "ここは<<place>0>だ" );
+
+		( ex.3 )
+		#amacro _mes( s0 )
+			db "<s0>",0
+		#endm
+		#amacro	_m( string )
+			_mes <string>
+		#endm
+		_m	$s1「そうだっけ？」
+
+		#amacro 時のパラメーターで、ダブルクオーテーション ( " ) で区切
+		らず文字列を指定する場合、半角スペース ( ' ' ) が通常使用できま
+		せん。しかし "\ " とすると、プリプロセッサでは素通りし、コンパ
+		イラーで半角スペースへ展開されます。
+
+		同様に \\, \', \", \?, はプリプロセッサでは素通りし、コンパイ
+		ラーで \ が取られ、1 文字へ展開されます。
+
+		\# は \< や \> と同等にプリプロセッサで展開され、コンパイラーへ
+		は # として渡されます。
+
+		なお、< と > でくくった場合、最大限の展開を行うので、展開を抑制
+		したい場合、{ と } でくくって下さい。
+
+		{ と } は、マクロ内のローカルラベルは最大限の展開を行いますが、
+		それ以降は 1 回のみ展開します。
+		2 回以上展開したい場合は {{ と }} のように、展開したい回数だけ
+		くくって下さい。
+
+		( ex.1 )
+		#define str00	name
+		#define string	str00
+		db "{string}"
+		は
+		db "str00"
+		と展開されます。
+
+		( ex.2 )
+		#define str00	name
+		#define string	str00
+		db "<string>"
+		は
+		db "name"
+		と展開されます。
+
+
+	◆演算子
+		#define/#adefine では、文字列演算子 ( # ), トークン結合演算子
+		( ## ), 文字化演算子 ( #@ ) が、使用可能です。
+		#macro/#amacro では、使用できないですが、これらの記号は予約さ
+		れていますので、注意が必要です。
+
+
+	◆blank 演算子
+		blank( macro name )
+
+		任意の macro が blank かを調べる演算子です。
+
+		#macro/#amacro 命令で定義された macro は 0 になる。
+		#define/#adefine 命令で定義され、パラメーター有り(ローカルパラ
+		メーターも含む)の場合は 0 になる。
+		#define/#adefine 命令で定義されていて、パラメーターが無く、内容
+		が space か tab だけ、もしくはなにも定義されていない場合には 1 
+		になる。
+		#define/#adefine 命令で定義され、演算子を含む物は error になる。
+		#define/#adefine 命令で定義され、定義物が存在する場合には 0 にな
+		る。
+
+		全角文字列を " で囲まず直接 blank で指定することは出来ません。
+		macro のパラメーターに直接、全角文字列を指定する場合などは注意
+		が必要です。
+
+		( ex.1 )
+		#amacro	_m( string0,string1 )
+		#if !blank( string1 )
+			message string1
+		#else
+			message string0
+		#endif
+		#endm
+
+		m	h0507,"春香「$s0先輩、/さっきもその話しましたけど・・・」"
+		m	"$s1「そうだっけ？」"
+
+
+		( ex.2 )
+		#amacro	_m( string0,string1 )
+		#if !blank( "<string1>" )
+			message "<string1>"
+		#else
+			message "<string0>"
+		#endif
+		#endm
+
+		m	h0507,春香「$s0先輩、/さっきもその話しましたけど・・・」
+		m	$s1「そうだっけ？」
+
+	◆defined 演算子
+		defined( macro name )
+
+;;;make 説明は、後日
+
+
+	◆#macro
+		#macro は、以下の 3 パターンの使用方法があります。
+
+		( ex.1 )
+		パラメーター無し、ローカルラベル無し
+			#macro	mes_abcdef
+				mes("abc");
+				mes("def");
+			#endm
+
+			mes_abcdef()
+
+		( ex.2 )
+		パラメーターあり、ローカルラベル無し
+			#macro	mes_2line( str0,str1 )
+				mes(str0);
+				mes(str1);
+			#endm
+
+			mes_2line("abc","def")
+
+		( ex.3 )
+		パラメーターなし、ローカルラベルあり
+			#macro	exit()(size0,size1)
+			size0:
+				dw	0
+				dw	size1-size0
+			size1:
+			#endm
+
+			exit()
+
+		( ex.4 )
+		パラメーターあり、ローカルラベルあり
+			#macro	DestoryWindow(num)(size0,size1)
+			size0:
+				dw	0
+				dw	size1-size0
+				dd	num
+			size1:
+			#endm
+
+			DestroyWindow( 0 )
+
+		( ex.5 )
+		パラメーターあり、ローカルラベルあり、パラメーター数指定有り
+		一番最後の数字を付けると、パラメーターの数をプリプロセッサー
+		がチェックします。
+			#macro	DestoryWindow(num)(size0,size1)(1)
+			size0:
+				dw	0
+				dw	size1-size0
+				dd	num
+			size1:
+			#endm
+
+			DestroyWindow( 0 )
+
+		( ex.6 )
+		パラメーターあり、ローカルラベルあり、パラメーター数指定有り
+		一番最後に (*) を付けると、実パラメーターの数を仮パラメーター
+		の数と同じとしてプリプロセッサーがチェックします。
+			#macro	DestoryWindow(num)(size0,size1)(*)
+			size0:
+				dw	0
+				dw	size1-size0
+				dd	num
+			size1:
+			#endm
+
+			DestroyWindow( 0 )
+
+		macro のパラメーターをその場で直接展開する場合、パラメーターに
+		\0 を付けてください。
+		このことは主に２重マクロを作る場合に使用する事があります。
+		\0 を付けずにパラメーターを付けると、一端 #define でパラメー
+		ターを展開して使用されます。
+		文字列マクロなどの場合、動作が変わりますので注意が必要です。
+
+		( ex.1 )
+			#amacro _ld_g( fn0 )
+				_ld_cg1 \0fn0
+			#endm
+			_ld_g ayax00
+
+			展開後
+				_ld_cg1 ayax00
+
+		( ex.2 )
+			#amacro _ld_g( fn0 )
+				_ld_cg1 fn0
+			#endm
+			_ld_g ayax00
+
+			展開後
+			#define ___W95CC__M_0000_fn0 ayax00
+				_ld_cg1 ___W95CC__M_0000_fn0
+
+
+	◆#unstr
+		#define と #adefine で定義された物から最初と最後の " を取り去ります。
+
+		#define sub_num	10
+		#define tmp "sub<label_num>"
+		#unstr tmp
+			dd	tmp
+		tmp:
+
+		これをプリプロセッサが以下のように展開します。
+
+			dd	sub10
+		sub10:
+
+
+	◆#functionstack
+		#functionstack は、#function で使用される stack の名前を設定します。
+
+		( ex.1 )
+		#functionstack		rsp
+
+
+	◆#functioncall
+		#functioncall は、#function を使用時に展開される命令の名前を設定します。
+
+		( ex.1 )
+		#functioncall		_func_call
+		_func_call _game_function_sub,rsp,4,r2000,r2001
+
+
+;;;make func
+	◆#amacro,#adefine
+		#amacro は、#macro の () を使用せずにパラメーターを渡す方法です。
+		アセンブラと同等の記述が可能となります。
+
+		( ex )
+			#amacro	DestoryWindow(num)(size0,size1)(*)
+			size0:
+				dw	0
+				dw	size1-size0
+				dd	num
+			size1:
+			#endm
+
+			DestroyWindow 0
+
+
+	◆#mbc
+		全角から始まる文字列の命令を定義します。
+
+		( ex.1 )
+		#mbc			_m
+
+		メッセージ
+
+		_m メッセージ
+
+
+	◆#mbcoff
+		#mbc の設定を取り消します。
+
+
+	◆#deletefile,#copyfile
+		file の delete や copy 等を行います。
+		ファイル名の指定には、"c:\\a.c" 等のように \ は 2 個にし、" で括
+		ります。
+
+		( ex )
+			// soc の bak file をコピー
+			#copyfile "{__FILE__1DPF}.BAK" "c:\\BAK\\{__FILE__1F}.BAK"
+			// 削除
+			#deletefile "{__FILE__1DPF}.BAK"
+
+	◆#existfile
+		file が存在するかをチェックします。
+		ファイル名の指定には、"c:\\a.c" 等のように \ は 2 個にし、" で括
+		ります。
+		0 なら存在しない、1 なら存在します
+
+		( ex )
+			#existfile EXISTF "{__FILE__1DPF}.BAK"
+			#if EXISTF==1
+			#deletefile "{__FILE__1DPF}.BAK"
+			#endif
+
+	◆#exec0
+		exe を実行します。終了を待たずにプリプロセスを次に進めます。
+
+		( ex )
+			#exec0 "c:\\wexec.exe"
+
+	◆#exec1
+		exe を実行します。終了を待ってプリプロセスを次に進めます。
+
+		( ex )
+			#exec1 "c:\\wexec.exe"
+
+	◆#openfile,#putfile,#closefile,#crfile
+		#openfile で出力 file を開き #putfile で書き込みを行う。
+		追記していくので #deletefile で最初に削除が必要です。
+		#closefile は明示的に行わなくても自動的に行われます。
+		#crfile は改行を出力します。
+
+		( ex )
+			#openfile "{__FILE__1DPF}.PT1" 0
+			#openfile "{__FILE__1DPF}.SO4" 1
+			#openfile "{__FILE__1DPF}.WA1" 2
+
+			#putfile "{string0}.pt1" 0
+			#putfile "{string0}.so4" 1
+			#putfile "{string0}.wa1" 2
+
+			#crfile 0
+			#crfile 1
+			#crfile 2
+
+			#closefile 0
+			#closefile 1
+			#closefile 2
+
+	◆#calc	identiry	exp
+		#calc は、その時点で計算式を解決します。
+		文字列中に数式の結果を使いたい場合には、これを使って下さい。
+
+		( ex.4 )
+		#calc LOCAL0 5+10+blank( NAME )
+		db	"5+10+blank( NAME ) = <LOCAL0>"
+
+	◆2,8,10,16 進数
+		2 進数 0n1111,0n0101 等、0n を先頭に付ける。
+		8 進数は互換性維持のため、使用できないようにしてあります。
+		16 進数は数字の頭に 0x を付けたタイプを使用して下さい。
+
+
+	◆プリプロセッサ汎用の数値スタックと文字列スタック
+		プリプロセッサにはユーザーが自由に使えるスタック式のメモリーが
+		用意されています。
+		スタックは、数値専用の数値スタックと文字専用の文字スタックの
+		２種類用意されています。この２つは全く別個な物です。
+		複雑な構造文をマクロで組む場合に使用します。
+
+		これらを利用して、if-elseif-else-end 等の構造文が作れます。
+
+		数値スタック上で使用できるのは整数値です。
+
+		#pushnum num		プリプロセス中、専用スタックに
+					数値パラメーターを push する
+		#popnum name		プリプロセス中、専用スタックから
+					数値パラメーターを pop する
+		#getnum name num	プリプロセス中、専用スタックから
+					数値パラメーターを拾得する
+		#addnumsp num		プリプロセス中、専用スタックへ値を足す
+		#subnumsp num		プリプロセス中、専用スタックへ値を引く
+		#getnumsp name		プリプロセス中、専用スタックの値を
+					拾得する
+		#searchnum name num	プリプロセス中、専用スタックから
+					数値パラメーターを探し、位置を拾得する
+					スタックに記憶したマーカーを検索する
+					ための物です
+					検索できなかった場合、65535 が返ります
+
+		文字スタック上で使用では、文字として扱われます。
+		文字が定義子の場合、展開してスタックに保存されます。
+
+		#pushstr name		プリプロセス中、専用スタックに
+					文字パラメーターを push する
+		#popstr name		プリプロセス中、専用スタックから
+					文字パラメーターを pop する
+		#getstr name num	プリプロセス中、専用スタックから
+					文字パラメーターを拾得する
+		#addstrsp num		プリプロセス中、専用スタックへ値を足す
+		#substrsp num		プリプロセス中、専用スタックへ値を引く
+		#getstrsp name		プリプロセス中、専用スタックの値を
+					拾得する
+
+	◆内部使用命令
+		これらの命令は、内部的に使用されている物なので、
+		使用しないでください。
+
+		#line line filename	ソースファイルをプリプロセスすると、
+		  又は  #line line	行がずれる。そのずれを修正するために、
+					ソースファイルの何行目かをコンパイラへ
+					知らせる。
+
+		#l2 line filename	マクロが使用されている場所をコンパイラ
+					に知らせる。
+					マクロ展開中コンパイラは #l2 でマクロ
+					が使用されている場所を拾得し、#line で
+					マクロが定義されている場所を拾得する。
+
+		#mle			マクロが展開し終わったことを知らせる。
+					マクロ展開のネストの解決や現在の
+					コンパイル行数の保持に使う。
+					これはプリプロセッサが出力し、
+					プリプロセッサが処理する。
+					最後に #l2e が出力されコンパイラに
+					知らせる。
+
+		#l2e			#mle が出力する物。
+					コンパイラはこれで #l2 の適用範囲の終了
+					を知る。
+
+		#expdefine name0 name1 	即座に name1 を展開して、name0 に定義
+					する。使用する必要はない。
+
+		#let			内部的にも未使用。
+
+●コンパイラディレクティブ
+	◆db
+	◆dw
+	◆dd
+	◆ep0
+	◆ep1
+	◆計算式命令
+		'r', '(', '*' で始まる行を展開します。
+		これらの命令を使用することによって、
+		左辺への代入式をそのまま書くことが出来きます。
+
+		cci			初期化する
+		cce  string		展開する文字列を指定する
+
+		calcexp 中で使える命令は、コンパイラ命令のみ
+		( ラベル,db,dw,dd,ep0,ep1 等 )
+		なぜなら、プリプロセッサーではなく、コンパイラ部で展開されるからです。
+
+		#cce の string の中で、以下のマクロを使用できる。
+		なお、$s は２重に展開はしない。
+
+			$n はグローバルナンバーを割り当てる
+			$s は計算式自体
+
+		( ex )
+			cci
+			cce		calc_size0$n:
+			cce		dw	0x024d
+			cce		dw	calc_size1$n-calc_size0$n
+			cce		ep0 $s
+			cce		calc_size1$n:
+
+
+	◆msc7.0 準拠の物
+		#line
+
+	◆内部使用命令
+		これらの命令は、内部的に使用されている物なので、
+		使用しないでください。
+
+		#l2,#l2e
+
+
+
+●ＰＡＳＳ
+	このコンパイラは、プリプロセッサを 1pas で処理した後、
+	コンパイルも 1pass で処理します。
+
+
+

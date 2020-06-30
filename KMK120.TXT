@@ -1,0 +1,509 @@
+make.cの実装は、忘れてしまいましたが、多分アセンブラバージョンと同じと思われます。
+
+
+
+	kmake.com version 1.20
+
+						by KENJI All right reserved
+
+
+【各ファイルの簡単な説明】
+	簡単に各ファイルの説明をします。
+
+	kmake.com	単純 make ver1.20
+
+
+【コマンドラインオプション】
+	kmake を実行すると自動的にカレントにある makefile.mak を読み込もうと
+	します。それ以外の物を読み込ませたい場合、-f オプションで指定します。
+
+	KMAKE [-options] [makefile] [-options]
+
+	-i		実行プログラムの error を無視して続けます。
+
+	-f<makefile>	makefile の指定をします。
+			通常は現在のカレントにある makefile.mak を読み込もうと
+			しますが、それ以外の物を読み込ませる場合に -f で指定し
+			ます。
+
+				>kmake.com -fc:\prj\makefile.mak
+
+			-f を使用しなくてもファイル名の指定は出来ます。
+
+				>kmake.com c:\prj\makefile.mak
+
+	-S		メモリーを swap して最大限のメモリーを実行プログラムが
+			使用できるようにします。
+
+	-B		無条件で全てのコマンド行を実行します。
+			実行プログラムの error 時の処理は -i で指定してない限り
+			中断しますので、注意が必要です。
+
+	-e		マクロを環境変数で展開しないようにします。
+			通常、登録していないマクロを参照された場合には環境変数
+			を使用してマクロを展開しますが、それを抑制します。
+
+	-N		ターゲットの作成に失敗したときにターゲットを削除しない
+			ようにします。デフォルトでは削除します。
+
+	-A		全てのターゲットファイルを削除してから make を実行
+			します。
+
+	-h or -? or -H	usage 表示
+
+	-D<macroname>	マクロをヌルで登録します。
+	-D<macroname>=	
+	<macroname>=	
+	<macroname>=""	
+			-D と macroname の間、macroname と = の間には space/tab
+			等を入れないで下さい。
+				>KMAKE make.mak -Dclear
+				>KMAKE make.mak -Dclear=
+				>KMAKE make.mak clear=
+				>KMAKE make.mak clear=""
+
+	-D<macroname>=macrodata
+	-D<macroname>="macrodata"
+	<macroname>=macrodata
+	<macroname>="macrodata"
+			マクロを登録します。
+			-D と macroname の間、macroname と = の間には space/tab
+			を入れないで下さい。
+			= と macrodata の間もしくは = と "macrodata" の間にも 
+			space/tab を入れないで下さい。
+			macrodata に space/tab を入れたい場合、" でくくって
+			下さい。
+			" でくくった場合のみ、macrodata の前後に space/tab を
+			付けることが出来ます。
+				>KMAKE make.mak -Dcom=PROG.EXE
+				>KMAKE make.mak -Dlink="optlink /T /MAP"
+				>KMAKE make.mak com=PROG.EXE
+				>KMAKE make.mak link="optlink /T /MAP"
+
+
+【使用方法】
+	makefile.mak をデフォルトで読み込みに行きます。
+	それ以外の makefile.mak をしていたい場合、コマンドラインで filename
+	を指定して下さい。
+
+	[makefile.mak]
+	>target... : dependent...
+	>	command1
+	>	[command2]
+	>	[command2]
+	>
+	>target... : dependent...
+	>	command1
+	>	[command2]
+	>	[command2]
+
+
+【サンプル】
+	[makefile.mak]
+	>kmake.obj : kmake.asm
+	>	optasm kmake.asm kmake.obj >kmake.err
+	>
+	>kmake.com : kmake.obj
+	>	optlink /T /MAP kmake.com,kmake.obj,kmake.map
+	>	mapsym kmake.map
+
+
+【コメント行 / コメント部】
+	# 記号以後の文字は無視されます。
+	行頭からコメントの行は空行として無視します。
+
+
+【ターゲット行】
+	行頭でターゲットを指定し、: 以降に依存ファイルを指定します。
+	: の前か後ろかに space/tab のどちから 1 文字が必要です。
+	ターゲット / 依存ファイルは複数指定することが可能で、space/tab で
+	区切って指定します。
+
+
+【コマンド行】
+	ターゲット行の後 ( すぐ次でなくても良い。例えばコメント行が間に入っても
+	良い ) に複数書くことが出来ます。
+
+
+【\ マーク】
+	行の最後が \ で、なおかつその前の文字が space/tab の場合は、次の行との
+	結合と見なします。
+
+		>target.com : source1.obj \
+		>             source2.obj \
+		>             source3.obj
+
+	は
+
+		>target.com : source1.obj source2.obj source3.obj
+
+	と結合されます。
+
+		>target.com : source1.obj\
+		>             source2.obj\
+		>             source3.obj
+
+	だと、結合されないので注意が必要です。
+
+
+【リダイレクト】
+	リダイレクトは >,>>,< が使用できます。| は使用できません。
+	なお command.com 経由ではなく自前で処理しています。
+
+
+【マクロ定義行】
+	macroname = macrodata
+
+	macroname はマクロ名です。マクロ名は、半角英数字を使用できます。
+	= の前後の space/tab と macrodata の後の space/tab は省略されます。
+	既に登録済みのマクロは、後から登録したマクロで上書きされます。
+	macroname は大文字と小文字で別の物と見なされます。
+	( ex. Name と NAME は別物 )
+
+	行頭に space/tab を入れることは基本的に出来ませんが、以下の場合は
+	入れることが出来ますが、お勧めしません。
+		1) ファイルの頭などターゲット行かコマンド行が初めて現れる
+		   以前の行。
+		2) 行頭から始まるマクロ定義行の後の行。
+
+	マクロの使い方は、$(macroname) で使用します。
+
+		>t0 = target.com
+		>s0 = source.obj
+		>$(t0) : $(s0)
+		>	optlink /T $(s0),$(t0)
+
+	は
+
+		>target.com : source.obj
+		>	optlink /T source.obj,target.com
+
+	と同等です。
+
+	定義されていないマクロを使用すると、環境変数と置換されます。
+	環境変数の名前は半角英数字の大文字を使用しているので、マクロで使用する
+	ときには必ず半角英数字の大文字で指定して下さい。
+
+	定義されておらず、環境変数に同じ物がない場合には何も出力されません。
+	つまりヌルと置換されます。
+
+	なお、macroname が 1 文字の場合、( と ) を省略して使用することが出来
+	ます。
+
+		>t = target.com
+		>s = source.obj
+		>$t : $s
+		>	optlink /T $s,$t
+
+
+【マクロ内の文字を置換】
+	マクロを使用するときに、マクロ内の文字を置換することもできます。
+
+	$(macroname:original=new)
+
+	なお : の前に space/tab を入れては行けません。: から = までの space/tab
+	を含む文字列を = から ) までの space/tab を含む文字列へ置換します。
+	なお、文字の大小を判別しますので注意が必要です。
+
+		>t0 = target.com
+		>$(t0:.com=.obj)
+
+	は
+
+		>target.obj
+
+	へ置換されます。
+	なお space/tab は不用意に入れないで下さい。
+
+		>t0 = tar get.com
+		>$(t0:tar =tar)
+
+	は
+
+		>target.com
+
+	へ置換されます。
+
+		>t0 = target.com
+		>s0 = source.obj
+		>$(t0) : $(s0)
+		>	optlink /T /MAP $(s0),$(t0),$(t0:.com=.map)
+		>	mapsym $(t0:.com=.map)
+
+	は
+
+		>target.com : source.obj
+		>	optlink /T /MAP source.obj,target.com,target.map
+		>	mapsym target.map
+
+	と同等です。
+
+
+【ファイルネーム展開マクロ】
+	任意の位置へターゲット行の target や dependent の pathname 等を
+	挿入します。
+
+		$@	一番最初のターゲットファイルのファイル名。
+		$*	一番最初のターゲットファイル名から拡張子を除いた物。
+		$**	全ての依存ファイルのファイル名。例外的にこれだけは
+			2 文字で 1 moji とみなします。
+		$?	ターゲットファイルより新しい全ての依存ファイルの
+			ファイル名。
+		$1	一番最初の依存ファイルのファイル名
+		$n	$1 と同様に、n 番目の依存ファイルのファイル名。
+			$1,$2,$3,$4,$5,$6,$7,$8,$9 が使えます。
+
+	以下の物は
+
+		>p1.obj : $*.asm macro.inc
+		>	optasm $@ $1 >$*.err
+		>p2.obj : $*.asm macro.inc
+		>	optasm $@ $1 >$*.err
+		>p3.obj : $*.asm macro.inc
+		>	optasm $@ $1 >$*.err
+
+	以下のように展開されます。
+
+		>p1.obj : p1.asm macro.inc
+		>	optasm p1.asm p1.obj >p1.err
+		>p2.obj : p2.asm macro.inc
+		>	optasm p2.asm p2.obj >p2.err
+		>p3.obj : p3.asm macro.inc
+		>	optasm p3.asm p3.obj >p3.err
+
+	これらだけでは作れないファイル名は、ファイルネーム展開マクロ修飾子を
+	使って作ることが出来ます。
+
+		R	ドライブ名とディレクトリー名とファイル名
+		D	ドライブ名とディレクトリー名
+		F	ファイル名と拡張子
+		B	ファイル名のみ
+
+	$@ が C:\PRJ\P1.ASM の場合、以下のようになります。
+
+		$(@R)	C:\PRJ\P1
+		$(@D)	C:\PRJ\
+		$(@F)	P1.ASM
+		$(@B)	P1
+
+	ターゲットファイルには使えません ( そのままの記号として使われます ) 。
+	依存ファイルにはには、$@,$* しか使えません。
+	コマンド行 ( 暗黙のコマンド行も含む ) には全てを使うことが出来ます。
+
+
+【暗黙のコマンドの宣言行】
+	任意の拡張子の file を任意の拡張子の file へ何ファイルかコンパイル
+	するとします。その際、毎回ほぼ同じコマンド行を入力せずにデフォルトの
+	コマンド行を指定することが出来ます。
+
+	.dependent_ext.target_ext:
+		command
+
+	暗黙のコマンドの宣言行の後のコマンド行は、暗黙のコマンド行として認識
+	されます。記述方法は通常のコマンド行と同じです。
+
+	たとえば以下のように、コマンド行がほぼ同じになる場合、前述の
+	ファイルネーム展開のマクロと暗黙のコマンド行を指定することにより、
+	毎回同じコマンド行を記述する必要が無くなります。
+
+		>p1.obj : p1.asm macro.inc
+		>	optasm p1.asm p1.obj >p1.err
+		>p2.obj : p2.asm macro.inc
+		>	optasm p2.asm p2.obj /DDEBUG=0 >p1.err
+		>p3.obj : p3.asm macro.inc
+		>	optasm p3.asm p3.obj >p1.err
+		>p4.obj : p4.asm macro.inc
+		>	optasm p4.asm p4.obj >p1.err
+
+	は、p1,p3,p4 を暗黙のコマンド行を使用し、p2 には個別に ( = 明示的に )
+	コマンド行をして、
+
+		>.asm .obj:
+		>	optasm $1 $@ >($1:.asm=.err)
+		>p1.obj : p1.asm macro.inc
+		>p2.obj : p2.asm macro.inc
+		>	optasm p2.asm p2.obj /DDEBUG=0 >p1.err
+		>p3.obj : p3.asm macro.inc
+		>p4.obj : p4.asm macro.inc
+
+	とすることが出来ます。
+	なお、ターゲットファイルの一番最初に記述された物と、依存ファイルの一番
+	最初に記述された物の拡張子を使用して暗黙のルールを選択します。
+
+	登録は 1 pass 目 ( 登録 pass ),展開は 2 pass 目 ( 実行 pass )に行われる
+	ので、最後に登録した暗黙のコマンドの宣言行がいつでも優先されます。
+
+		>.asm .obj:
+		>	tasm $1 $@ >($1:.asm=.err)
+		>
+		>p1.obj : p1.asm macro.inc
+		>
+		>.asm .obj:
+		>	optasm $1 $@ >($1:.asm=.err)
+		>
+		>p2.obj : p2.asm macro.inc
+
+	以上のようにした場合、p1.obj も p2.obj も otpasm が優先されます。
+	p1.obj に tasm は適用されませんので注意が必要です。
+
+
+【単純なコマンド行】
+	makefile の任意のタイミングで、コマンドを実行できます。
+	行の先頭が : の場合、それを単純なコマンド行と見なし実行します。
+
+		>:echo p1
+		>p1.obj : p1.asm macro.inc
+		>	optasm p1.asm p1.obj >p1.err
+		>:echo p2
+		>p2.obj : p2.asm macro.inc
+		>	optasm p2.asm p2.obj /DDEBUG=0 >p1.err
+		>:echo p3
+		>p3.obj : p3.asm macro.inc
+		>	optasm p3.asm p3.obj >p1.err
+		>:echo p4
+		>p4.obj : p4.asm macro.inc
+		>	optasm p4.asm p4.obj >p1.err
+
+	以上のようにした場合、echo で画面に文字が表示されます。
+	なお、dos の内部コマンドだけではなく、任意のコマンドが実行出来ます。
+
+
+【ver1.10以前の物との相違点】
+	以前のバージョンですと、ターゲットの作成に失敗したときにターゲットを
+	削除しませんでしたが、ver1.20 以降のバージョンでは削除します。
+
+
+【ディテクティブ】
+	makefile 中で制御できるディテクティブは以下の通りです。
+	なおディテクティブは、指定した時点で有効です。
+
+	.i		コマンドラインオプションの -i と同等です。
+	.i-		.i もしくはコマンドラインオプションの -i を抑制します。
+	.S		コマンドラインオプションの -S と同等です。
+	.S-		.S もしくはコマンドラインオプションの -S を抑制します。
+	.B		コマンドラインオプションの -B と同等です。
+	.B-		.B もしくはコマンドラインオプションの -B を抑制します。
+	.e		コマンドラインオプションの -e と同等です。
+	.e-		.e もしくはコマンドラインオプションの -e を抑制します。
+	.N		コマンドラインオプションの -N と同等です。
+	.N-		.N もしくはコマンドラインオプションの -N を抑制します。
+	.A		コマンドラインオプションの -A と同等です。
+	.A-		.A もしくはコマンドラインオプションの -A を抑制します。
+
+	ライブラリーの作成など、ターゲットの作成に失敗しても削除したくない物が
+	ある場合、ディテクティブを指定して、機能を設定して下さい。
+
+		>.B
+		>p1.obj : p1.asm macro.inc
+		>	optasm p1.asm p1.obj >p1.err
+		>p2.obj : p2.asm macro.inc
+		>	optasm p2.asm p2.obj /DDEBUG=0 >p1.err
+		>.B-
+		>p3.obj : p3.asm macro.inc
+		>	optasm p3.asm p3.obj >p1.err
+		>p4.obj : p4.asm macro.inc
+		>	optasm p4.asm p4.obj >p1.err
+
+	以上のようにした場合、毎回 p1.obj と p2.obj は作成されます。
+
+
+【改訂の記録】
+	v1.00	1999	08/23	　最初のバージョン
+	v1.10	1999	08/29	　マクロ機能
+				　マクロ内の文字置換、
+				　ファイルネーム展開マクロ
+				　暗黙のコマンド行
+	v1.20	2000	01/21	　単純なコマンド行
+				　ターゲット作成失敗の削除
+				　ディテクティブのバグを fix
+
+
+【連絡先】
+	URL			http://member.nifty.ne.jp/KENJI/
+	E-MAIL  		kenji@blackpackage.gr.jp
+	ZOB			ZOB11789
+　　　　東京ＢＢＳ　　　　　　　KAKERA  
+	NIFTY-Serve		GEG06337
+	BLACK PACKAGE-NET	BP0003/SYSOP ( 03-5669-5223 )
+
+
+【チェック機種】
+	HP200LX
+	Libretto100 + Windows95
+	PC-9821Ra266改 + Windows95
+	PC-9821Ra300改 + Windows98
+
+
+【著作権表示／使用上の注意】
+	　このプログラムは freeware で使用には一切の料金は取りませんが著作権の
+	放棄は致しません。
+
+	　このプログラムを使用したことによって生じた損害は、全く保証しません。
+	もし、ＨＤ等が壊れても、作者は保証しません。作者は、このプログラムに不
+	備があっても、それを訂正する義務を負いません。
+
+
+【最大の感謝】
+	感想等をくださった皆さん、どうも有り難う御座いました。
+
+
+【古いソフト】
+	URL を書いておきますので、以下の soft が必要になったら来て下さいね。
+	ここに載っていない物も相当ありますが、ソースが現存しないので、
+	ここに有る物以外で欲しい物があっても、殆どなくなってるかも。
+	dos 汎用の物は * を付けておきます。
+
+	【Win用FreeSoft】
+	WC1_2.LZH 書式通り計算のライン電卓 ver1.2
+	WE1_2.LZH ホットキーランチャー ver1.2
+	WD1_1.LZH ホットキーダイヤルアップ ver1.1
+	未完成:lan 内 WCALL 単純チャットシステム ver1.0
+
+	【susie plug-in】
+	SPCX110.LZH PCX の susie plug-in ver1.10
+
+	【dos汎用FreeSoft】
+	*KMK120.LZH  単純 make ver1.20
+	*MIXL110.LZH nifty/zob 等の生ログをシンクロ／マージ
+	*SCD2_0A.LZH EMS 使用の PUSHD & POPD
+
+	【音源ドライバー msdrv 関連】
+	MS4_5A.LZH FM/MIDI/PCM ドライバー v4.5a
+	MSP4_5A.LZH msdrv4 用の pcmdriver v4.5a
+	EDS4_5A.LZH 音楽エディターver4.5a
+	MSM4_3B.LZH mml コンパイラー for msdrv
+	MSS4_5A.LZH 効果音エディターver4.5a
+	MST4_5A.LZH msdrv4.5a の仕様書
+	R2M4_3C.LZH .rcp/.r36 を ms ( msdrv4 用データー ) へ変換
+
+	【常駐型ＣＤプレーヤー cdp 関連】
+	*CDP4_5B.LZH 常駐型ＣＤプレイヤー v4.5b
+	*CDPT4_5B.LZH 常駐型ＣＤプレイヤー v4.5 の仕様書
+	CDME1_0A.LZH CDM extender v1.0a
+	CDD3_2.LZH 常駐cd-menu player ver3.2
+
+	【常駐型ツール関連】
+	KC2_5.LZH 常駐型 tools ( calc, bmp, mag, text, memory )
+	FSC3_0A.LZH 常駐型ファイルセレクター
+	PAL2_3.LZH 常駐パレット & 常駐パレット制御ツール
+	SME2_4.LZH 常駐型 １行メモ
+	XCD1_1.LZH キーペースター
+
+	【cg の加工関連】
+	BMPL1_1.LZH bmp loader
+	BMPS1_0.LZH bmp saver
+	CMAG1_0.LZH mag から ベタ 拾得 v1.0
+	CZIM1_0.LZH zim から ベタ 拾得 v1.0
+
+	【umb 関連】
+	*UMBT1_3.LZH COMMAND.COM と CONFIG を UMB へ移動させるツール
+
+	【ゲーム開発関連】
+	FC1_0B.LZH game 組込用 file cache system v1.0b
+	XT1_0A.LZH 386 専用 xms driver v1.0a
+
+	【pc9821xa10のためのツール】
+	WSSCD01.LZH WSS を殺しても内蔵 CD を使用可能にする
+
+
+						ＫＥＮＪＩ（ＫＡＫＥＲＡ）
