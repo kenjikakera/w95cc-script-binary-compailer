@@ -152,13 +152,13 @@
 		printf ( "ここは<<place>0>だ" );
 
 		( ex.3 )
-		#amacro _mes( s0 )
+		#amacro mes( s0 )
 			db "<s0>",0
 		#endm
-		#amacro	_m( string )
-			_mes <string>
+		#amacro	m( string )
+			mes <string>
 		#endm
-		_m	$s1「そうだっけ？」
+		m	$s1「そうだっけ？」
 
 		#amacro 時のパラメーターで、ダブルクオーテーション ( " ) で区切
 		らず文字列を指定する場合、半角スペース ( ' ' ) が通常使用できま
@@ -403,11 +403,11 @@
 		全角から始まる文字列の命令を定義します。
 
 		( ex.1 )
-		#mbc			_m
+		#mbc			m
 
 		メッセージ
 
-		_m メッセージ
+		m メッセージ
 
 
 	◆#mbcoff
