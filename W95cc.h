@@ -3,13 +3,13 @@
 		define
 =============================================================================
 ===========================================================================*/
-#define ASM_FLAG 1
+#define ASM_FLAG 1				// 1:インラインアセンブラやハッシュ等の自作のアセンブラライブラリ使用(386以上) 0:cオンリー(通常はこちらでの運用を推奨します
 #define UCHAR unsigned char
 #define UINT unsigned int
 #define FILE_NAME_MAX 256
 #define FALSE 0
 #define TRUE 1
-#define USE_OCT 0
+#define USE_OCT 0				// 0:8進数を許容しない
 
 
 #define MAXINCLUDEFILE	256				// include できる file の数
