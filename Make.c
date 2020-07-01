@@ -70,7 +70,7 @@ int makecall(int argv, char **argc );
 #define MAX_ARGC		256
 
 int fPrint;					/* 画面表示を行うか? */
-int makemode;
+int makemode;			/* 内蔵make.cを利用するか 0:使わない 1;使う */
 BYTE szTool0[_MAX_PATH];	/* tool の名前 */
 BYTE szTool1[_MAX_PATH];	/* tool の名前
 
