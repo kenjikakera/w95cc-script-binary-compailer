@@ -29,7 +29,7 @@
 //typedef unsigned char UCHAR;
 //typedef unsigned char BYTE;
 
-#include "\obj2\make.h"
+#include "make.h"
 
 #define W95CC_MODE	1
 
