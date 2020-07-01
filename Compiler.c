@@ -315,7 +315,7 @@ void delete_node(int p)
 void BtprsMain( int size )
 {
 //
-//		btprs main
+//		btprs main(íPèÉÇ»lzss/lz77Ç≈Ç∑)
 //
 	int i0,i1;							/* loop counter for init dictionary */
 	int i, c, len, r, s, lastmatchlen, codeptr;
